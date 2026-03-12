@@ -1,0 +1,19 @@
+app:
+  auto_index_new_files: false
+  auto_start: false
+  data_dir: data
+embedding:
+  api_base_url: https://api.openai.com/v1
+  api_key: sk-your-api-key-here
+  embedding_dim: 1536
+  model: text-embedding-3-small
+  query_prefix_enabled: false
+  enable_sparse: false
+indexing:
+  chunk_overlap_tokens: 64
+  chunk_size_tokens: 512
+  disable_large_file_protection: false
+  enable_content_code: false
+  enable_content_docs: false
+  include_paths: []
+  user_exclusions: []
