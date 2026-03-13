@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build MahiroSearch Linux package with PyInstaller (onefile)."""
+"""Build MahiroSearch Linux package with PyInstaller (onedir + tar.gz)."""
 
 from __future__ import annotations
 
@@ -8,10 +8,16 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 
 APP_NAME = "MahiroSearch"
+QT_PLUGIN_DIRS = [
+    "platforms",
+    "platforminputcontexts",
+    "xcbglintegrations",
+]
 EXCLUDED_MODULES = [
     "PyQt5",
     "PyQt6",
@@ -50,6 +56,44 @@ EXCLUDED_MODULES = [
 ]
 
 
+def _get_qt_plugins_dir() -> Path:
+    from PySide6.QtCore import QLibraryInfo
+
+    return Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath))
+
+
+def _add_qt_plugin_binaries(cmd: list[str]) -> None:
+    plugins_root = _get_qt_plugins_dir()
+
+    for plugin_dir_name in QT_PLUGIN_DIRS:
+        plugin_dir = plugins_root / plugin_dir_name
+        if not plugin_dir.exists():
+            print(f"Skipping missing Qt plugin dir: {plugin_dir}")
+            continue
+
+        for plugin_file in sorted(plugin_dir.rglob("*")):
+            if not plugin_file.is_file():
+                continue
+            relative_parent = plugin_file.relative_to(plugin_dir).parent
+            cmd.extend(
+                [
+                    "--add-binary",
+                    f"{plugin_file}:{Path('PySide6') / 'plugins' / plugin_dir_name / relative_parent}",
+                ]
+            )
+
+
+def _make_linux_archive(dist_dir: Path) -> Path:
+    archive_name = f"{APP_NAME}-linux-{platform.machine()}.tar.gz"
+    archive_path = dist_dir / archive_name
+    app_dir = dist_dir / APP_NAME
+
+    with tarfile.open(archive_path, "w:gz") as tar:
+        tar.add(app_dir, arcname=APP_NAME)
+
+    return archive_path
+
+
 def main() -> int:
     if platform.system() != "Linux":
         print("build_linux.py can only run on Linux")
@@ -73,7 +117,7 @@ def main() -> int:
         "--noconfirm",
         "--clean",
         "--windowed",
-        "--onefile",
+        "--onedir",
         "--name",
         APP_NAME,
         "--collect-data",
@@ -92,6 +136,8 @@ def main() -> int:
 
     for module in EXCLUDED_MODULES:
         cmd.extend(["--exclude-module", module])
+
+    _add_qt_plugin_binaries(cmd)
 
     upx_dir = os.environ.get("UPX_DIR")
     if not upx_dir:
@@ -118,8 +164,11 @@ def main() -> int:
         print(f"Build failed with exit code: {result.returncode}")
         return result.returncode
 
-    bin_path = root / "dist" / APP_NAME
-    print(f"Build complete: {bin_path}")
+    dist_dir = root / "dist"
+    app_dir = dist_dir / APP_NAME
+    archive_path = _make_linux_archive(dist_dir)
+    print(f"Build complete: {app_dir}")
+    print(f"Archive created: {archive_path}")
     return 0
 
 
