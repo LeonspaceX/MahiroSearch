@@ -92,6 +92,20 @@ class MainWindow(FluentWindow):
         self.raise_()
         self.activateWindow()
 
+    def bring_to_front(self):
+        if self.isMinimized():
+            self.showNormal()
+        elif not self.isVisible():
+            self.show()
+
+        self.setWindowState(
+            (self.windowState() & ~Qt.WindowState.WindowMinimized)
+            | Qt.WindowState.WindowActive
+        )
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
     def quit_from_tray(self):
         self._quitting = True
         self.tray_icon.hide()

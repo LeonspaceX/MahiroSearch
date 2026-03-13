@@ -1,6 +1,8 @@
 ﻿#!/usr/bin/env python3
 """MahiroSearch - AI Semantic Search for Local Files."""
 
+import getpass
+import hashlib
 import os
 import signal
 import sys
@@ -58,6 +60,7 @@ sys.stderr = _StderrFilter(sys.stderr)
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
 from config import AppConfig
@@ -92,6 +95,82 @@ def cleanup_resources():
         pass
 
 
+def _single_instance_server_name() -> str:
+    user = getpass.getuser() or "default"
+    digest = hashlib.sha256(user.encode("utf-8", errors="ignore")).hexdigest()[:12]
+    return f"MahiroSearch.{digest}"
+
+
+class SingleInstanceManager:
+    ACTIVATE_MESSAGE = b"ACTIVATE"
+
+    def __init__(self, server_name: str) -> None:
+        self._server_name = server_name
+        self._server: QLocalServer | None = None
+        self._activate_handler = None
+        self._activation_pending = False
+
+    def notify_existing_instance(self) -> bool:
+        socket = QLocalSocket()
+        socket.connectToServer(self._server_name)
+        if not socket.waitForConnected(250):
+            return False
+
+        socket.write(self.ACTIVATE_MESSAGE)
+        socket.flush()
+        socket.waitForBytesWritten(250)
+        socket.disconnectFromServer()
+        return True
+
+    def start(self) -> bool:
+        self._server = QLocalServer()
+        self._server.newConnection.connect(self._on_new_connection)
+        if self._server.listen(self._server_name):
+            return True
+
+        probe = QLocalSocket()
+        probe.connectToServer(self._server_name)
+        if probe.waitForConnected(250):
+            probe.disconnectFromServer()
+            return False
+
+        QLocalServer.removeServer(self._server_name)
+        return self._server.listen(self._server_name)
+
+    def set_activate_handler(self, handler) -> None:
+        self._activate_handler = handler
+        if self._activation_pending and self._activate_handler is not None:
+            self._activation_pending = False
+            QTimer.singleShot(0, self._activate_handler)
+
+    def cleanup(self) -> None:
+        if self._server is not None:
+            self._server.close()
+            self._server.deleteLater()
+            self._server = None
+        QLocalServer.removeServer(self._server_name)
+
+    def _on_new_connection(self) -> None:
+        if self._server is None:
+            return
+
+        while self._server.hasPendingConnections():
+            socket = self._server.nextPendingConnection()
+            if socket is None:
+                continue
+            socket.readyRead.connect(lambda s=socket: self._handle_message(s))
+            socket.disconnected.connect(socket.deleteLater)
+
+    def _handle_message(self, socket: QLocalSocket) -> None:
+        message = bytes(socket.readAll()).decode(errors="ignore").strip()
+        if message == self.ACTIVATE_MESSAGE.decode():
+            if self._activate_handler is not None:
+                QTimer.singleShot(0, self._activate_handler)
+            else:
+                self._activation_pending = True
+        socket.disconnectFromServer()
+
+
 def main():
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -106,6 +185,15 @@ def main():
     setTheme(Theme.AUTO)
     app.setApplicationName("MahiroSearch")
     app.setOrganizationName("MahiroSearch")
+
+    instance_manager = SingleInstanceManager(_single_instance_server_name())
+    if instance_manager.notify_existing_instance():
+        return
+    if not instance_manager.start():
+        if instance_manager.notify_existing_instance():
+            return
+        print("MahiroSearch is already running.")
+        return
 
     def handle_sigint(signum, frame):
         print("\n收到退出信号，正在关闭应用...")
@@ -127,8 +215,10 @@ def main():
 
     window = MainWindow(cfg)
     window.show()
+    instance_manager.set_activate_handler(window.bring_to_front)
 
     app.aboutToQuit.connect(cleanup_resources)
+    app.aboutToQuit.connect(instance_manager.cleanup)
 
     try:
         exit_code = app.exec()
