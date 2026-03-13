@@ -22,6 +22,7 @@ from qfluentwidgets import (
     ScrollArea,
     StrongBodyLabel,
 )
+from config import get_config_path
 from ui.widgets.result_card import ResultCard
 from utils.file_open import reveal_in_file_manager
 from workers.search_worker import SearchWorker
@@ -146,7 +147,7 @@ class SearchPage(QWidget):
         return True
 
     def _save_api_key(self, api_key: str) -> None:
-        cfg_path = Path("config.yaml")
+        cfg_path = get_config_path()
         data = {}
 
         if cfg_path.exists():

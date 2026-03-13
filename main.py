@@ -58,7 +58,7 @@ class _NullStderr:
 
 sys.stderr = _StderrFilter(sys.stderr)
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
@@ -171,6 +171,17 @@ class SingleInstanceManager:
         socket.disconnectFromServer()
 
 
+class _MacActivationHandler(QObject):
+    def __init__(self, window, parent=None) -> None:
+        super().__init__(parent)
+        self._window = window
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.ApplicationActivate:
+            QTimer.singleShot(0, self._window.bring_to_front)
+        return False
+
+
 def main():
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -178,6 +189,8 @@ def main():
 
     app = QApplication(sys.argv)
     _ensure_valid_app_font(app)
+    if sys.platform == "darwin":
+        app.setQuitOnLastWindowClosed(False)
 
     from qfluentwidgets import Theme, setTheme
     from ui.main_window import MainWindow
@@ -216,6 +229,10 @@ def main():
     window = MainWindow(cfg)
     window.show()
     instance_manager.set_activate_handler(window.bring_to_front)
+    if sys.platform == "darwin":
+        activation_handler = _MacActivationHandler(window, app)
+        app._mac_activation_handler = activation_handler
+        app.installEventFilter(activation_handler)
 
     app.aboutToQuit.connect(cleanup_resources)
     app.aboutToQuit.connect(instance_manager.cleanup)

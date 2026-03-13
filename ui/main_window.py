@@ -1,8 +1,9 @@
 ﻿"""Main application window."""
 
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QStyle, QSystemTrayIcon
 
@@ -19,6 +20,8 @@ class MainWindow(FluentWindow):
         super().__init__()
         self.cfg = cfg
         self._quitting = False
+        self._use_tray = sys.platform != "darwin" and QSystemTrayIcon.isSystemTrayAvailable()
+        self.tray_icon: QSystemTrayIcon | None = None
         self._app_icon = self._load_app_icon()
         self.setup_ui()
         self.setup_tray()
@@ -49,6 +52,9 @@ class MainWindow(FluentWindow):
         self.switchTo(self.search_page)
 
     def setup_tray(self):
+        if not self._use_tray:
+            return
+
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(self._app_icon)
         self.tray_icon.setToolTip("MahiroSearch")
@@ -88,9 +94,7 @@ class MainWindow(FluentWindow):
                 self.show_window()
 
     def show_window(self):
-        self.show()
-        self.raise_()
-        self.activateWindow()
+        self.bring_to_front()
 
     def bring_to_front(self):
         if self.isMinimized():
@@ -106,9 +110,15 @@ class MainWindow(FluentWindow):
         self.raise_()
         self.activateWindow()
 
+    def systemTitleBarRect(self, size):
+        if sys.platform == "darwin":
+            return QRect(0, 0, 75, size.height())
+        return super().systemTitleBarRect(size)
+
     def quit_from_tray(self):
         self._quitting = True
-        self.tray_icon.hide()
+        if self.tray_icon is not None:
+            self.tray_icon.hide()
         app = QApplication.instance()
         if app is not None:
             app.quit()
@@ -119,7 +129,7 @@ class MainWindow(FluentWindow):
         if self._quitting:
             event.accept()
             return
-        if self.tray_icon.isVisible():
+        if self._use_tray and self.tray_icon is not None and self.tray_icon.isVisible():
             self.hide()
             event.ignore()
             return

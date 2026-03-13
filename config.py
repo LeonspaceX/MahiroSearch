@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import yaml
@@ -26,6 +27,28 @@ class IndexingConfig(BaseModel):
     include_paths: list[str] = Field(default_factory=list)
 
 
+_APP_NAME = "MahiroSearch"
+def _app_support_dir() -> Path:
+    root = Path.home() / "Library" / "Application Support" / _APP_NAME
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def resolve_data_dir(path_value: str | Path) -> Path:
+    path = Path(path_value).expanduser()
+    if path.is_absolute():
+        return path
+    if sys.platform == "darwin":
+        return _app_support_dir() / path
+    return path
+
+
+def get_config_path() -> Path:
+    if sys.platform == "darwin":
+        return _app_support_dir() / "config.yaml"
+    return Path("config.yaml")
+
+
 class AppConfig(BaseModel):
     auto_start: bool = False
     auto_index_new_files: bool = False
@@ -36,7 +59,7 @@ class AppConfig(BaseModel):
     @classmethod
     def load(cls) -> "AppConfig":
         """Load configuration from config.yaml."""
-        yaml_path = Path("config.yaml")
+        yaml_path = get_config_path()
         yaml_data: dict = {}
 
         # Auto-generate config.yaml on first run.
@@ -82,7 +105,7 @@ class AppConfig(BaseModel):
         top_level = {
             "auto_start": yaml_data.get("app", {}).get("auto_start", False),
             "auto_index_new_files": yaml_data.get("app", {}).get("auto_index_new_files", False),
-            "data_dir": Path(yaml_data.get("app", {}).get("data_dir", "data")),
+            "data_dir": resolve_data_dir(yaml_data.get("app", {}).get("data_dir", "data")),
         }
 
         # Extract embedding config

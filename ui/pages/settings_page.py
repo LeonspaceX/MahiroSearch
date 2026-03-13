@@ -1,7 +1,5 @@
 """Settings page."""
 
-from pathlib import Path
-
 import yaml
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
@@ -11,6 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from config import get_config_path
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
@@ -263,14 +262,14 @@ class SettingsPage(QWidget):
         return row
 
     def _read_cfg(self) -> dict:
-        cfg_path = Path("config.yaml")
+        cfg_path = get_config_path()
         if cfg_path.exists():
             with cfg_path.open("r", encoding="utf-8") as f:
                 return yaml.safe_load(f) or {}
         return {}
 
     def _write_cfg(self, data: dict):
-        cfg_path = Path("config.yaml")
+        cfg_path = get_config_path()
         with cfg_path.open("w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True)
 

@@ -1,5 +1,6 @@
 ﻿"""Index page."""
 
+from config import get_config_path
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QMessageBox,
@@ -194,9 +195,8 @@ class IndexPage(QWidget):
 
     def _write_cfg(self, section, key, value):
         import yaml
-        from pathlib import Path
 
-        cfg_path = Path("config.yaml")
+        cfg_path = get_config_path()
         data = {}
         if cfg_path.exists():
             with cfg_path.open("r", encoding="utf-8") as f:
