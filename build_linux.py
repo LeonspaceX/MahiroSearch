@@ -19,15 +19,11 @@ def main() -> int:
 
     root = Path(__file__).resolve().parent
     main_py = root / "main.py"
-    config_yaml = root / "config.yaml"
     icon_png = root / "icon.png"
     icon_ico = root / "icon.ico"
 
     if not main_py.exists():
         print("main.py not found")
-        return 1
-    if not config_yaml.exists():
-        print("config.yaml not found")
         return 1
 
     icon = icon_png if icon_png.exists() else (icon_ico if icon_ico.exists() else None)
@@ -54,8 +50,6 @@ def main() -> int:
         "tiktoken_ext",
         "--hidden-import",
         "tiktoken_ext.openai_public",
-        "--add-data",
-        f"{config_yaml}:.",
     ]
 
     if icon_png.exists():
@@ -82,4 +76,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
