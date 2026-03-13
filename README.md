@@ -43,7 +43,7 @@ python main.py
 
 ## 🛠️ TODO
 
-- [ ] Github Workflow
+- [x] Github Workflow
 
 ## 项目架构
 
@@ -62,8 +62,8 @@ main.py           Application entry point
 # 许可证
 
 GNU General Public License v3.0 (GPLv3)
+
 Copyright (C) 2026 Leonxie
-See [LICENSE](LICENSE)
 
 
 
